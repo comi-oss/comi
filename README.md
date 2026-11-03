@@ -72,6 +72,20 @@ npm run tauri -- ios dev
 
 iOS compilation, signing, and package size have not been verified on this Linux machine.
 
+## Waydroid phone orientation
+
+```sh
+bash scripts/waydroid-display.sh portrait
+bash scripts/waydroid-display.sh landscape
+bash scripts/waydroid-display.sh toggle
+```
+
+Portrait uses a 432 × 960 window; landscape uses 960 × 432. On a desktop with 2× scaling, Android renders at 864 × 1920 or 1920 × 864 internally. Switching briefly restarts the Waydroid session and reopens CF Map. It waits for Android to boot, clears display overrides, and verifies the applied physical resolution before reporting success. A user systemd service keeps the restarted session alive after the helper exits. Concurrent switches are rejected.
+
+This helper requires Linux with Waydroid, systemd user services, ADB, Bash, Python 3, and standard Linux command-line tools. Accept Android's ADB authorization prompt if shown. The `potrait` spelling is also accepted as an alias.
+
+Vite excludes local SDKs, generated native projects, build outputs, and downloads from file watching. This avoids exhausting the host's inotify limit, which can prevent Waydroid's Android input service from starting.
+
 ## Scope
 
 No custom native commands or plugins are exposed to the hosted website. The only Android permission requested by this viewer is internet access. Tamagui styles the local loading/retry screen; the map's interface retains the website's own design.

@@ -7,6 +7,10 @@ export default defineConfig(({ mode }) => ({
     'process.env.NODE_ENV': JSON.stringify(mode),
     'process.env': {},
   },
-  server: { port: 1420, strictPort: true },
+  server: {
+    port: 1420,
+    strictPort: true,
+    watch: { ignored: ['**/.tools/**', '**/src-tauri/target/**', '**/src-tauri/gen/**', '**/artifacts/**', '**/downloads/**'] },
+  },
   clearScreen: false,
 }))
