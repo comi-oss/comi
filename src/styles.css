@@ -1,0 +1,27 @@
+html, body, #root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 100dvh;
+  background: #fbf7ea;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  overscroll-behavior: none;
+}
+
+#root { display: flex; }
+* { box-sizing: border-box; }
+
+.map-mark {
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  border-radius: 26px;
+  background: #f2e7cb;
+  color: #2a2a2a;
+}
+
+.map-mark svg { width: 48px; height: 48px; }
