@@ -1,0 +1,16 @@
+[
+  {
+    "file": "downloads/cf-map-arm64-v8a-preview.apk",
+    "bytes": 6830673,
+    "MB": 6.83,
+    "MiB": 6.51,
+    "sha256": "9416c4a51f028b9fa65c4faf75618a5e2a6173a755e010b19b3cbd9ecf1993a1"
+  },
+  {
+    "file": "downloads/cf-map-x86_64-preview.apk",
+    "bytes": 7182926,
+    "MB": 7.18,
+    "MiB": 6.85,
+    "sha256": "511543f6da356fbdb7af4e8856deed2b5bcbd0ee61b8cd522978db40f3ab1d49"
+  }
+]

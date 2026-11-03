@@ -13,8 +13,11 @@ if [[ ! -f "$preview_keystore" ]]; then
     -dname 'CN=CF Map Local Preview' -storepass android -keypass android
   chmod 600 "$preview_keystore"
 fi
-for abi in arm64-v8a x86_64; do
-  input="src-tauri/gen/android/app/build/outputs/apk/$abi/release/app-$abi-release-unsigned.apk"
+if [[ $# -eq 0 ]]; then set -- arm64-v8a x86_64; fi
+for abi in "$@"; do
+  flavor="$abi"
+  if [[ "$abi" == arm64-v8a ]]; then flavor=arm64; fi
+  input="src-tauri/gen/android/app/build/outputs/apk/$flavor/release/app-$flavor-release-unsigned.apk"
   aligned=".tools/aligned-apks/$abi.apk"
   output="artifacts/cf-map-$abi-preview.apk"
   if [[ ! -f "$input" ]]; then

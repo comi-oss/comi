@@ -4,6 +4,17 @@ A minimal Tauri 2 mobile viewer for [cf.mikira.id](https://cf.mikira.id/), the u
 
 The website rejects iframe embedding, so this viewer uses full-page navigation. Map behavior, search, favorites, and data remain provided by the original website. Initial loading needs internet access. This repository does not bundle or claim ownership of the website or map data.
 
+## Download the Android preview
+
+| Device | Signed APK | Size |
+|---|---|---|
+| ARM64 Android phone | [Download](downloads/cf-map-arm64-v8a-preview.apk) | 6.83 MB (6,830,673 bytes) |
+| x86_64 Waydroid | [Download](downloads/cf-map-x86_64-preview.apk) | 7.18 MB (7,182,926 bytes) |
+
+These are optimized release builds signed with a local preview certificate for sideloading. Exact sizes and SHA-256 hashes are in [the size report](downloads/apk-sizes.json). Sizes exclude the system WebView and downloaded website data.
+
+Verified: both APK signatures, two production frontend tests, loading the live map at phone size, and installation plus map rendering in Waydroid. ARM64 was compiled and signed but has not been run on a physical phone.
+
 ## Run and verify
 
 ```sh
@@ -38,7 +49,7 @@ Release APKs are split by architecture. `android:sign-preview` signs them with a
 - `artifacts/cf-map-x86_64-preview.apk`: Waydroid on this computer.
 - `artifacts/apk-sizes.json`: exact byte counts, MB/MiB sizes, and SHA-256 checksums.
 
-Build tools, caches, screenshots, and APKs are ignored by Git. Download size excludes the system WebView and website data/cache.
+Build tools, caches, screenshots, and local APK outputs are ignored by Git. The `downloads/` directory contains the signed preview snapshots linked above.
 
 For Waydroid, start Android and accept its ADB authorization dialog when prompted:
 
@@ -46,7 +57,7 @@ For Waydroid, start Android and accept its ADB authorization dialog when prompte
 waydroid show-full-ui
 # Find the current IP in `waydroid status`.
 adb connect 192.168.240.112:5555
-adb install -r artifacts/cf-map-x86_64-preview.apk
+adb install --no-incremental -r artifacts/cf-map-x86_64-preview.apk
 adb shell am start -n id.mikira.cf.viewer/.MainActivity
 ```
 
