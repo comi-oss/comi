@@ -1,32 +1,20 @@
 {
-  "name": "comi-map",
+  "name": "comi",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.1",
   "type": "module",
+  "packageManager": "pnpm@10.32.1",
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview --host 0.0.0.0",
+    "dev": "tauri dev",
+    "build": "tauri build",
     "tauri": "tauri",
     "android:build": "bash scripts/android.sh build --apk --split-per-abi --target aarch64 x86_64",
     "android:dev": "bash scripts/android.sh dev",
-    "test": "npm run build && playwright test",
     "android:init": "bash scripts/android.sh init --ci --skip-targets-install",
-    "android:sign-preview": "bash scripts/sign-preview.sh"
-  },
-  "dependencies": {
-    "@tamagui/config": "3.1.10",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "tamagui": "3.1.10"
+    "android:sign-preview": "bash scripts/sign-preview.sh",
+    "waydroid:display": "bash scripts/waydroid-display.sh"
   },
   "devDependencies": {
-    "@playwright/test": "^1.64.1",
-    "@tauri-apps/cli": "2.12.4",
-    "@types/react": "^19.2.0",
-    "@types/react-dom": "^19.2.0",
-    "@vitejs/plugin-react": "latest",
-    "typescript": "^5.9.3",
-    "vite": "8.3.5"
+    "@tauri-apps/cli": "2.12.4"
   }
 }

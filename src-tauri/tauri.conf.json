@@ -1,24 +1,23 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "CF Map",
-  "version": "0.1.0",
+  "productName": "Comi",
+  "version": "0.2.1",
   "identifier": "id.mikira.cf.viewer",
   "build": {
-    "beforeDevCommand": "npm run dev",
-    "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm run build",
-    "frontendDist": "../dist"
+    "frontendDist": "https://cf.mikira.id/"
   },
   "app": {
-    "windows": [{
-      "label": "main",
-      "title": "CF Map",
-      "width": 432,
-      "height": 960,
-      "backgroundColor": "#fbf7ea"
-    }],
+    "windows": [
+      {
+        "label": "main",
+        "title": "Comi",
+        "width": 432,
+        "height": 960,
+        "backgroundColor": "#fbf7ea",
+        "url": "https://cf.mikira.id/"
+      }
+    ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://cf.mikira.id; object-src 'none'; base-uri 'self'",
       "capabilities": []
     }
   },
@@ -26,6 +25,8 @@
     "active": true,
     "targets": "all",
     "shortDescription": "The Comifuro map, in your pocket.",
-    "android": { "minSdkVersion": 24 }
+    "android": {
+      "minSdkVersion": 24
+    }
   }
 }

@@ -1,91 +1,63 @@
-# CF Map
+# Comi
 
-A minimal Tauri 2 mobile viewer for [cf.mikira.id](https://cf.mikira.id/), the unofficial Comifuro map. React 19 and Tamagui 3 provide the loading and connection retry screen. The app then navigates its WebView directly to the map, with no app toolbar or additional tabs.
+A minimal Tauri 2 app that opens [cf.mikira.id](https://cf.mikira.id/) directly in the system WebView. It displays only the unofficial Comifuro map: no custom shell, tabs, shop, character profile, or bundled web frontend.
 
-The website rejects iframe embedding, so this viewer uses full-page navigation. Map behavior, search, favorites, and data remain provided by the original website. Initial loading needs internet access. This repository does not bundle or claim ownership of the website or map data.
+The website supplies the map, search, and saved-booth list. Comi adds a pixel chest shortcut to that list above the map controls; it stays attached to the controls as the bottom sheet moves. Initial access requires internet. The map's artwork and data are not bundled or claimed by this repository.
 
-## Download the Android preview
+## Requirements
 
-| Device | Signed APK | Size |
-|---|---|---|
-| ARM64 Android phone | [Download](downloads/cf-map-arm64-v8a-preview.apk) | 6.83 MB (6,830,673 bytes) |
-| x86_64 Waydroid | [Download](downloads/cf-map-x86_64-preview.apk) | 7.18 MB (7,182,926 bytes) |
-
-These are optimized release builds signed with a local preview certificate for sideloading. Exact sizes and SHA-256 hashes are in [the size report](downloads/apk-sizes.json). Sizes exclude the system WebView and downloaded website data.
-
-Verified: both APK signatures, two production frontend tests, loading the live map at phone size, and installation plus map rendering in Waydroid. ARM64 was compiled and signed but has not been run on a physical phone.
-
-## Run and verify
+Use Rust, Node.js 22+, and pnpm 10.32.1. Android builds use Java 21 and the Android SDK with `platform-tools`, `platforms;android-36`, `build-tools;36.0.0`, and NDK `27.2.12479018`.
 
 ```sh
-npm ci
-npm run dev
-npm test
-```
-
-Tests run the production frontend at a 432 × 960 viewport and verify direct navigation and offline recovery. They use Google Chrome at `/usr/bin/google-chrome`; set `CHROME_PATH` to override that path. `npm run build` checks TypeScript and produces the web bundle.
-
-## Android
-
-Use Java 21, Rust, and the Android SDK with `platform-tools`, `platforms;android-36`, `build-tools;36.0.0`, and NDK `27.2.12479018`. Add Rust targets:
-
-```sh
+pnpm install --frozen-lockfile
 rustup target add aarch64-linux-android x86_64-linux-android
+pnpm android:dev
+pnpm android:build
+pnpm android:sign-preview
 ```
 
-The build helper defaults to `.tools/android-sdk`, Java at `/usr/lib/jvm/java-21-openjdk-amd64`, and `.tools/gradle` for Gradle downloads. Override `ANDROID_HOME`, `NDK_HOME`, or `JAVA_HOME` to use an existing installation. The checked-in Android project targets API 36 and supports Android 7.0+ (API 24).
+There is no frontend development server or JavaScript UI dependency. The only pnpm dependency is the Tauri CLI. The app's URL is configured in `src-tauri/tauri.conf.json`; `src-tauri/src/lib.rs` injects the inventory shortcut into the map page. The Pxlkit icon is attributed in the map footer; see [third-party notices](THIRD_PARTY_NOTICES.md). Generated Kotlin/Gradle files provide the standard Android host and compile/package the Rust library.
 
-```sh
-npm run android:dev
-npm run android:build
-npm run android:sign-preview
-```
+The Android build helper defaults to `.tools/android-sdk`, Java at `/usr/lib/jvm/java-21-openjdk-amd64`, and `.tools/gradle`. Override `ANDROID_HOME`, `NDK_HOME`, or `JAVA_HOME` for an existing installation. The checked-in Android project targets API 36 and supports Android 7.0+ (API 24). If regenerating it with `pnpm android:init`, check the requested SDK and preserve the pnpm invocation in `BuildTask.kt`.
 
-The Android project is already generated. If regenerating with `npm run android:init`, check the template's compile/target SDK and retain API 36, or install the SDK version requested by the template.
+For desktop development, `pnpm dev` runs the Tauri app and `pnpm build` creates desktop bundles; install the corresponding Tauri system prerequisites first.
 
-Release APKs are split by architecture. `android:sign-preview` signs them with an automatically generated **local development certificate** using the conventional test password `android`. These builds are for local sideloading, not store publication. Keep `.tools/preview.keystore` if you want to install future updates over the same app; use a separate production signing setup before publishing.
+## Android previews
 
-- `artifacts/cf-map-arm64-v8a-preview.apk`: ARM64 Android phones.
-- `artifacts/cf-map-x86_64-preview.apk`: Waydroid on this computer.
+The signing script creates optimized release APKs with a local development certificate using the conventional test password `android`. They are for sideloading, not store publication. Keep `.tools/preview.keystore` to install future updates over the same app; configure production signing separately before publishing.
+
+- `artifacts/comi-arm64-v8a-preview.apk`: ARM64 Android phones.
+- `artifacts/comi-x86_64-preview.apk`: x86_64 Waydroid.
 - `artifacts/apk-sizes.json`: exact byte counts, MB/MiB sizes, and SHA-256 checksums.
-
-Build tools, caches, screenshots, and local APK outputs are ignored by Git. The `downloads/` directory contains the signed preview snapshots linked above.
-
-For Waydroid, start Android and accept its ADB authorization dialog when prompted:
+- [`downloads/`](downloads/): signed preview snapshots and their size report. Package size excludes the system WebView and downloaded map data.
 
 ```sh
 waydroid show-full-ui
-# Find the current IP in `waydroid status`.
+# Find the current IP in `waydroid status`; accept ADB authorization if prompted.
 adb connect 192.168.240.112:5555
-adb install --no-incremental -r artifacts/cf-map-x86_64-preview.apk
+adb install --no-incremental -r artifacts/comi-x86_64-preview.apk
 adb shell am start -n id.mikira.cf.viewer/.MainActivity
 ```
 
-## iOS
-
-The shared app can be built with Tauri on macOS with Xcode and the iOS prerequisites installed:
+## Waydroid orientation
 
 ```sh
-npm run tauri -- ios init
-npm run tauri -- ios dev
+pnpm waydroid:display portrait
+pnpm waydroid:display landscape
+pnpm waydroid:display toggle
+```
+
+Portrait uses 432 × 960; landscape uses 960 × 432. At 2× desktop scaling, Android renders at 864 × 1920 or 1920 × 864 internally. Switching briefly restarts the Waydroid session and reopens Comi. The helper waits for Android to boot and verifies the actual resolution before reporting success. A user systemd service keeps the restarted session alive; concurrent switches are rejected. Requires Waydroid, systemd user services, ADB, Bash, Python 3, and standard Linux tools. `potrait` is accepted as an alias.
+
+`waydroid show-full-ui` means the full Android interface, not desktop fullscreen. For independent desktop windows per Android app, Waydroid also provides `persist.waydroid.multi_windows` mode.
+
+## iOS
+
+Build on macOS with Xcode and Tauri's iOS prerequisites installed:
+
+```sh
+pnpm tauri ios init
+pnpm tauri ios dev
 ```
 
 iOS compilation, signing, and package size have not been verified on this Linux machine.
-
-## Waydroid phone orientation
-
-```sh
-bash scripts/waydroid-display.sh portrait
-bash scripts/waydroid-display.sh landscape
-bash scripts/waydroid-display.sh toggle
-```
-
-Portrait uses a 432 × 960 window; landscape uses 960 × 432. On a desktop with 2× scaling, Android renders at 864 × 1920 or 1920 × 864 internally. Switching briefly restarts the Waydroid session and reopens CF Map. It waits for Android to boot, clears display overrides, and verifies the applied physical resolution before reporting success. A user systemd service keeps the restarted session alive after the helper exits. Concurrent switches are rejected.
-
-This helper requires Linux with Waydroid, systemd user services, ADB, Bash, Python 3, and standard Linux command-line tools. Accept Android's ADB authorization prompt if shown. The `potrait` spelling is also accepted as an alias.
-
-Vite excludes local SDKs, generated native projects, build outputs, and downloads from file watching. This avoids exhausting the host's inotify limit, which can prevent Waydroid's Android input service from starting.
-
-## Scope
-
-No custom native commands or plugins are exposed to the hosted website. The only Android permission requested by this viewer is internet access. Tamagui styles the local loading/retry screen; the map's interface retains the website's own design.

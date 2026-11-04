@@ -1,16 +1,16 @@
 [
   {
-    "file": "downloads/cf-map-arm64-v8a-preview.apk",
-    "bytes": 6830673,
-    "MB": 6.83,
-    "MiB": 6.51,
-    "sha256": "9416c4a51f028b9fa65c4faf75618a5e2a6173a755e010b19b3cbd9ecf1993a1"
+    "file": "downloads/comi-arm64-v8a-preview.apk",
+    "bytes": 7555661,
+    "MB": 7.56,
+    "MiB": 7.21,
+    "sha256": "771b111b53d6f67b2068a474eab04c40986e4d68010d26a117f6c549a2f5e6a1"
   },
   {
-    "file": "downloads/cf-map-x86_64-preview.apk",
-    "bytes": 7182926,
-    "MB": 7.18,
-    "MiB": 6.85,
-    "sha256": "511543f6da356fbdb7af4e8856deed2b5bcbd0ee61b8cd522978db40f3ab1d49"
+    "file": "downloads/comi-x86_64-preview.apk",
+    "bytes": 7920202,
+    "MB": 7.92,
+    "MiB": 7.55,
+    "sha256": "fad56c2f52e96e5caa68082dc9c55e3284b8689643aa94a288a6e5667fc3f74a"
   }
 ]

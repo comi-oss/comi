@@ -1,12 +1,12 @@
 [package]
-name = "comi-map"
-version = "0.1.0"
+name = "comi"
+version = "0.2.1"
 description = "A minimal mobile viewer for the unofficial Comifuro map"
 edition = "2021"
 license = "MIT"
 
 [lib]
-name = "comi_map_lib"
+name = "comi_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

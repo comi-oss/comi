@@ -10,7 +10,7 @@ mkdir -p artifacts .tools/aligned-apks
 if [[ ! -f "$preview_keystore" ]]; then
   keytool -genkeypair -noprompt -keystore "$preview_keystore" \
     -alias preview -keyalg RSA -keysize 2048 -validity 3650 \
-    -dname 'CN=CF Map Local Preview' -storepass android -keypass android
+    -dname 'CN=comi Local Preview' -storepass android -keypass android
   chmod 600 "$preview_keystore"
 fi
 if [[ $# -eq 0 ]]; then set -- arm64-v8a x86_64; fi
@@ -19,9 +19,9 @@ for abi in "$@"; do
   if [[ "$abi" == arm64-v8a ]]; then flavor=arm64; fi
   input="src-tauri/gen/android/app/build/outputs/apk/$flavor/release/app-$flavor-release-unsigned.apk"
   aligned=".tools/aligned-apks/$abi.apk"
-  output="artifacts/cf-map-$abi-preview.apk"
+  output="artifacts/comi-$abi-preview.apk"
   if [[ ! -f "$input" ]]; then
-    echo "Missing APK: $input. Run npm run android:build first." >&2
+    echo "Missing APK: $input. Run pnpm android:build first." >&2
     exit 1
   fi
   "$build_tools/zipalign" -P 16 -f 4 "$input" "$aligned"
@@ -34,7 +34,7 @@ python3 - <<'PY'
 import hashlib, json
 from pathlib import Path
 report = []
-for path in sorted(Path('artifacts').glob('cf-map-*-preview.apk')):
+for path in sorted(Path('artifacts').glob('comi-*-preview.apk')):
     size = path.stat().st_size
     report.append({'file': str(path), 'bytes': size, 'MB': round(size / 1_000_000, 2),
                    'MiB': round(size / 1_048_576, 2),
