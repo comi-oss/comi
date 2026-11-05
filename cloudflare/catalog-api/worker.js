@@ -22,6 +22,31 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { headers: cors });
     if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405);
     if (url.pathname === "/health") return json({ ok: true, service: "comi-catalog-api" });
+    if (url.pathname === "/catalog/manifest") {
+      const object = await env.CATALOG_RELEASES.get("catalog/current.json");
+      if (!object) return json({ error: "catalog_not_published" }, 404);
+      return new Response(object.body, {
+        headers: {
+          ...cors,
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "public, max-age=60, s-maxage=300",
+          "ETag": object.httpEtag,
+        },
+      });
+    }
+    const releaseMatch = url.pathname.match(/^\/catalog\/([a-zA-Z0-9._-]+\.sqlite)$/);
+    if (releaseMatch) {
+      const object = await env.CATALOG_RELEASES.get(`catalog/${releaseMatch[1]}`);
+      if (!object) return json({ error: "catalog_release_not_found" }, 404);
+      return new Response(object.body, {
+        headers: {
+          ...cors,
+          "Content-Type": "application/vnd.sqlite3",
+          "Cache-Control": "public, max-age=31536000, immutable",
+          "ETag": object.httpEtag,
+        },
+      });
+    }
     if (url.pathname !== "/items") return json({ error: "not_found" }, 404);
 
     const event = url.searchParams.get("event") || "cf23";

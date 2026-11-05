@@ -1,6 +1,11 @@
 use base64::{engine::general_purpose::STANDARD, Engine as _};
+use rusqlite::{params, Connection, OpenFlags};
 use sha2::{Digest, Sha256};
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::PathBuf,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use tauri::{webview::PageLoadEvent, AppHandle, Manager};
 
 const INVENTORY_SHORTCUT_SCRIPT: &str = include_str!("../assets/inventory-shortcut.js");
@@ -8,13 +13,129 @@ const INVENTORY_CSS: &str = include_str!("../assets/inventory-overlay.css");
 const COMI_CHEST_ICON: &str = include_str!("../assets/comi-chest.svg");
 const CATALOG_API: &str = "https://comi-catalog-api.ryanadi001.workers.dev";
 
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CatalogManifest {
+    version: String,
+    sha256: String,
+    url: String,
+}
+
 #[tauri::command]
 async fn catalog_items(
+    app: AppHandle,
     query: String,
     booth: String,
     offset: u32,
 ) -> Result<serde_json::Value, String> {
-    reqwest::Client::new()
+    let client = reqwest::Client::new();
+    let cache_dir = app
+        .path()
+        .app_cache_dir()
+        .map_err(|_| "Could not access the catalog cache.".to_owned())?
+        .join("catalog");
+    fs::create_dir_all(&cache_dir).map_err(|_| "Could not create the catalog cache.".to_owned())?;
+
+    let mut release_path = None;
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let checked_at = cache_dir.join("manifest-checked-at");
+    let refresh_manifest = fs::read_to_string(&checked_at)
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .is_none_or(|checked| now.saturating_sub(checked) >= 300);
+    if refresh_manifest {
+        let _ = fs::write(&checked_at, now.to_string());
+    }
+    if refresh_manifest {
+        if let Ok(response) = client
+            .get(format!("{CATALOG_API}/catalog/manifest"))
+            .send()
+            .await
+        {
+            if let Ok(response) = response.error_for_status() {
+                if let Ok(manifest) = response.json::<CatalogManifest>().await {
+                    if manifest
+                        .version
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')
+                        && manifest.url.starts_with("/catalog/catalog-")
+                        && manifest.url.ends_with(".sqlite")
+                    {
+                        let target = cache_dir.join(format!("catalog-{}.sqlite", manifest.version));
+                        let current_version =
+                            fs::read_to_string(cache_dir.join("current.txt")).ok();
+                        let valid_cached = current_version
+                            .as_deref()
+                            .is_some_and(|version| version.trim() == manifest.version)
+                            && target.is_file();
+                        let valid_existing_release = !valid_cached
+                            && fs::read(&target).ok().is_some_and(|bytes| {
+                                format!("{:x}", Sha256::digest(bytes)) == manifest.sha256
+                            });
+                        if valid_cached || valid_existing_release {
+                            let _ = fs::write(
+                                cache_dir.join("current.txt"),
+                                manifest.version.as_bytes(),
+                            );
+                            release_path = Some(target);
+                        } else if let Ok(response) = client
+                            .get(format!("{CATALOG_API}{}", manifest.url))
+                            .send()
+                            .await
+                        {
+                            if let Ok(response) = response.error_for_status() {
+                                if let Ok(bytes) = response.bytes().await {
+                                    let digest = format!("{:x}", Sha256::digest(&bytes));
+                                    if digest == manifest.sha256 {
+                                        let temporary = target.with_extension("sqlite.tmp");
+                                        if fs::write(&temporary, &bytes).is_ok()
+                                            && fs::rename(&temporary, &target).is_ok()
+                                        {
+                                            let _ = fs::write(
+                                                cache_dir.join("current.txt"),
+                                                manifest.version.as_bytes(),
+                                            );
+                                            if let Ok(entries) = fs::read_dir(&cache_dir) {
+                                                for entry in entries.flatten() {
+                                                    let path = entry.path();
+                                                    if path != target
+                                                        && path
+                                                            .extension()
+                                                            .is_some_and(|ext| ext == "sqlite")
+                                                    {
+                                                        let _ = fs::remove_file(path);
+                                                    }
+                                                }
+                                            }
+                                            release_path = Some(target);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Once installed, the last good release remains usable when offline or when the
+    // manifest endpoint is temporarily unavailable.
+    if release_path.is_none() {
+        release_path = fs::read_to_string(cache_dir.join("current.txt"))
+            .ok()
+            .map(|version| cache_dir.join(format!("catalog-{}.sqlite", version.trim())))
+            .filter(|path| path.is_file());
+    }
+    if let Some(path) = release_path {
+        return query_cached_catalog(&path, &query, &booth, offset);
+    }
+
+    // Keep first install functional until the first R2 catalog release is published.
+    client
         .get(format!("{CATALOG_API}/items"))
         .query(&[
             ("event", "cf23"),
@@ -31,6 +152,71 @@ async fn catalog_items(
         .json()
         .await
         .map_err(|_| "The Comifuro catalog response was invalid.".to_owned())
+}
+
+fn query_cached_catalog(
+    path: &PathBuf,
+    query: &str,
+    booth: &str,
+    offset: u32,
+) -> Result<serde_json::Value, String> {
+    let db = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .map_err(|_| "The saved Comifuro catalog could not be opened.".to_owned())?;
+    let pattern = if query.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "%{}%",
+            query
+                .replace('\\', "\\\\")
+                .replace('%', "\\%")
+                .replace('_', "\\_")
+        )
+    };
+    let mut statement = db
+        .prepare(
+            r#"
+        SELECT id,name,category,fandom,characters_json,price_text,price_amount,currency,
+               variants_json,availability,confidence,review_status,booth_id,booth_name,
+               schedules_json,source_url,image_source
+        FROM items
+        WHERE (?1 = '' OR lower(booth_name) = lower(?1) OR booth_id = ?1)
+          AND (?2 = '' OR name LIKE ?2 ESCAPE '\' COLLATE NOCASE
+               OR booth_name LIKE ?2 ESCAPE '\' COLLATE NOCASE)
+        ORDER BY booth_name COLLATE NOCASE, name COLLATE NOCASE
+        LIMIT 41 OFFSET ?3
+    "#,
+        )
+        .map_err(|_| "The saved catalog has an unsupported format.".to_owned())?;
+    let rows = statement.query_map(params![booth, pattern, offset], |row| {
+        Ok(serde_json::json!({
+            "id": row.get::<_, String>(0)?, "name": row.get::<_, String>(1)?,
+            "category": row.get::<_, Option<String>>(2)?, "fandom": row.get::<_, Option<String>>(3)?,
+            "characters": parse_json(row.get::<_, Option<String>>(4)?.as_deref()),
+            "priceText": row.get::<_, Option<String>>(5)?, "priceAmount": row.get::<_, Option<f64>>(6)?,
+            "currency": row.get::<_, Option<String>>(7)?,
+            "variants": parse_json(row.get::<_, Option<String>>(8)?.as_deref()),
+            "availability": row.get::<_, Option<String>>(9)?, "confidence": row.get::<_, Option<f64>>(10)?,
+            "reviewStatus": row.get::<_, Option<String>>(11)?, "boothId": row.get::<_, Option<String>>(12)?,
+            "boothName": row.get::<_, Option<String>>(13)?,
+            "schedules": parse_json(row.get::<_, Option<String>>(14)?.as_deref()),
+            "sourceUrl": row.get::<_, Option<String>>(15)?, "imageSource": row.get::<_, Option<String>>(16)?,
+        }))
+    }).map_err(|_| "Could not query the saved Comifuro catalog.".to_owned())?;
+    let collected: Result<Vec<_>, _> = rows.collect();
+    let mut items =
+        collected.map_err(|_| "Could not read the saved Comifuro catalog.".to_owned())?;
+    let has_more = items.len() > 40;
+    items.truncate(40);
+    Ok(
+        serde_json::json!({"event":"cf23","items":items,"limit":40,"offset":offset,"hasMore":has_more}),
+    )
+}
+
+fn parse_json(value: Option<&str>) -> serde_json::Value {
+    value
+        .and_then(|value| serde_json::from_str(value).ok())
+        .unwrap_or(serde_json::Value::Null)
 }
 
 #[tauri::command]

@@ -7,3 +7,7 @@ workers_dev = true
 binding = "DB"
 database_name = "comi"
 database_id = "9a85f3f9-50cb-49fb-9051-c0abd46d9485"
+
+[[r2_buckets]]
+binding = "CATALOG_RELEASES"
+bucket_name = "comi-catalog-releases"

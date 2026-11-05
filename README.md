@@ -1,5 +1,28 @@
 # Comi
 
+## Catalog release publishing
+
+The catalog API can publish immutable SQLite snapshots from the live D1-backed
+`/items` endpoint to the `comi-catalog-releases` R2 bucket. The app checks the
+small current manifest when it opens the shopping list, downloads a changed
+snapshot once, verifies its SHA-256, and reads the local SQLite copy thereafter.
+The last installed copy stays available offline. Before the first snapshot is
+published, the app continues using the existing D1 API.
+
+R2 must first be enabled for the Cloudflare account in the dashboard. Then create
+the bucket once and publish a release using Wrangler (the script reads the
+existing `../scraper/.env` token without printing it):
+
+```sh
+pnpm dlx wrangler r2 bucket create comi-catalog-releases
+pnpm catalog:publish
+```
+
+`pnpm catalog:publish` fetches the current catalog, builds a compact SQLite
+snapshot under ignored `dist/catalog/`, deploys the Worker with its R2 binding,
+uploads the immutable database, then updates the current manifest. Run it again
+after scraper data has been synced to D1.
+
 A minimal Tauri 2 app that opens [cf.mikira.id](https://cf.mikira.id/) directly in the system WebView and adds a Comifuro shopping list.
 
 The website supplies the map, search, and saved-booth list. Comi adds a chest shortcut above the map controls; it stays attached as the bottom sheet moves and opens a searchable catalog and locally saved shopping list with quantities and a running total. Catalog reads use the public, read-only Cloudflare Worker in [cloudflare/catalog-api](cloudflare/catalog-api), bound to the scraper's Comi D1 database. Shopping list entries stay on the device. Extracted catalog prices and items may need review. Initial map and catalog access require internet. The map's artwork and data are not bundled or claimed by this repository.
