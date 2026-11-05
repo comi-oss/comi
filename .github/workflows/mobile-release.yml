@@ -83,7 +83,7 @@ jobs:
           input=src-tauri/gen/android/app/build/outputs/apk/arm64/release/app-arm64-release-unsigned.apk
           aligned="$RUNNER_TEMP/comi-arm64-aligned.apk"
           keystore="$RUNNER_TEMP/comi-preview.keystore"
-          output="$RUNNER_TEMP/Comi-${VERSION}.apk"
+          output="$RUNNER_TEMP/Comi-${VERSION}-Android.apk"
           test -n "$ANDROID_KEYSTORE_BASE64"
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore"
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -P 16 -f 4 "$input" "$aligned"
@@ -96,7 +96,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: android-arm64
-          path: ${{ runner.temp }}/Comi-${{ needs.version.outputs.version }}.apk
+          path: ${{ runner.temp }}/Comi-${{ needs.version.outputs.version }}-Android.apk
           if-no-files-found: error
 
   ios:
@@ -142,20 +142,20 @@ jobs:
           set -euo pipefail
           ipa="$(find src-tauri/gen/apple/build -type f -name '*.ipa' -print -quit)"
           test -n "$ipa"
-          if [[ "$IOS_SIGNING_CONFIGURED" == "true" ]]; then
-            cp "$ipa" "$RUNNER_TEMP/Comi-${VERSION}-ios-personal-team.ipa"
-          else
-            cp "$ipa" "$RUNNER_TEMP/Comi-${VERSION}-ios-unsigned.ipa"
-          fi
+          cp "$ipa" "$RUNNER_TEMP/Comi-${VERSION}-IOS.ipa"
 
       - uses: actions/upload-artifact@v4
         with:
           name: ios-unsigned
-          path: ${{ runner.temp }}/Comi-${{ needs.version.outputs.version }}-ios-*.ipa
+          path: ${{ runner.temp }}/Comi-${{ needs.version.outputs.version }}-IOS.ipa
           if-no-files-found: error
 
   release:
-    if: github.event.pull_request.merged == true
+    if: >-
+      always() &&
+      github.event.pull_request.merged == true &&
+      needs.version.result == 'success' &&
+      (needs.android.result == 'success' || needs.ios.result == 'success')
     needs: [version, android, ios]
     runs-on: ubuntu-latest
     steps:
