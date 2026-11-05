@@ -1,0 +1,9 @@
+name = "comi-catalog-api"
+main = "worker.js"
+compatibility_date = "2026-11-04"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "comi"
+database_id = "9a85f3f9-50cb-49fb-9051-c0abd46d9485"

@@ -1,8 +1,8 @@
 # Comi
 
-A minimal Tauri 2 app that opens [cf.mikira.id](https://cf.mikira.id/) directly in the system WebView. It displays only the unofficial Comifuro map: no custom shell, tabs, shop, character profile, or bundled web frontend.
+A minimal Tauri 2 app that opens [cf.mikira.id](https://cf.mikira.id/) directly in the system WebView and adds a Comifuro shopping list.
 
-The website supplies the map, search, and saved-booth list. Comi adds a pixel chest shortcut to that list above the map controls; it stays attached to the controls as the bottom sheet moves. Initial access requires internet. The map's artwork and data are not bundled or claimed by this repository.
+The website supplies the map, search, and saved-booth list. Comi adds a chest shortcut above the map controls; it stays attached as the bottom sheet moves and opens a searchable catalog and locally saved shopping list with quantities and a running total. Catalog reads use the public, read-only Cloudflare Worker in [cloudflare/catalog-api](cloudflare/catalog-api), bound to the scraper's Comi D1 database. Shopping list entries stay on the device. Extracted catalog prices and items may need review. Initial map and catalog access require internet. The map's artwork and data are not bundled or claimed by this repository.
 
 ## Requirements
 
@@ -16,7 +16,7 @@ pnpm android:build
 pnpm android:sign-preview
 ```
 
-There is no frontend development server or JavaScript UI dependency. The only pnpm dependency is the Tauri CLI. The app's URL is configured in `src-tauri/tauri.conf.json`; `src-tauri/src/lib.rs` injects the inventory shortcut into the map page. The Pxlkit icon is attributed in the map footer; see [third-party notices](THIRD_PARTY_NOTICES.md). Generated Kotlin/Gradle files provide the standard Android host and compile/package the Rust library.
+There is no frontend development server or JavaScript UI dependency. The only pnpm dependency is the Tauri CLI. The app's URL is configured in `src-tauri/tauri.conf.json`; `src-tauri/src/lib.rs` injects the shopping-list shortcut and uses a narrow Rust command to fetch catalog data because the map's Content Security Policy blocks direct cross-origin requests. The UI follows the map website language and color theme. The API URL is public; no Cloudflare credentials are shipped in the app. Generated Kotlin/Gradle files provide the standard Android host and compile/package the Rust library.
 
 The Android build helper defaults to `.tools/android-sdk`, Java at `/usr/lib/jvm/java-21-openjdk-amd64`, and `.tools/gradle`. Override `ANDROID_HOME`, `NDK_HOME`, or `JAVA_HOME` for an existing installation. The checked-in Android project targets API 36 and supports Android 7.0+ (API 24). If regenerating it with `pnpm android:init`, check the requested SDK and preserve the pnpm invocation in `BuildTask.kt`.
 
@@ -29,7 +29,15 @@ The signing script creates optimized release APKs with a local development certi
 - `artifacts/comi-arm64-v8a-preview.apk`: ARM64 Android phones.
 - `artifacts/comi-x86_64-preview.apk`: x86_64 Waydroid.
 - `artifacts/apk-sizes.json`: exact byte counts, MB/MiB sizes, and SHA-256 checksums.
-- [`downloads/`](downloads/): signed preview snapshots and their size report. Package size excludes the system WebView and downloaded map data.
+- Merged pull requests to `main` produce Android ARM64 and iOS builds in a GitHub prerelease. The Android APK is signed with the repository's preview key. iOS builds are unsigned until the optional Personal Team secrets below are configured.
+
+### Free iOS device signing
+
+For personal testing, sign into Xcode on a Mac with your Apple Account and use its free **Personal Team**. Set the generated Tauri iOS project to automatic signing, connect and register your iPhone, then build and run once from Xcode. Xcode creates a development certificate and a provisioning profile for that device. Export the Apple Development identity (including its private key) as a password-protected `.p12`; copy the matching `.mobileprovision` from `~/Library/MobileDevice/Provisioning Profiles/`.
+
+Store base64-encoded contents as GitHub Actions secrets named `IOS_CERTIFICATE`, `IOS_CERTIFICATE_PASSWORD`, and `IOS_MOBILE_PROVISION`. CI passes them to Tauri's iOS build using its documented manual-signing environment variables and exports a development IPA for devices included in the profile. Do not commit the `.p12` or profile. If these secrets are absent, CI publishes an unsigned IPA instead.
+
+This free route is for your own device testing only. Personal Team App IDs, registered devices, and provisioning profiles expire after seven days, so refresh the profile and update the secret regularly; the app must be rebuilt and reinstalled after expiry. It cannot publish to TestFlight or the App Store. Apple requires paid Developer Program membership for those distribution features.
 
 ```sh
 waydroid show-full-ui
@@ -50,6 +58,16 @@ pnpm waydroid:display toggle
 Portrait uses 432 × 960; landscape uses 960 × 432. At 2× desktop scaling, Android renders at 864 × 1920 or 1920 × 864 internally. Switching briefly restarts the Waydroid session and reopens Comi. The helper waits for Android to boot and verifies the actual resolution before reporting success. A user systemd service keeps the restarted session alive; concurrent switches are rejected. Requires Waydroid, systemd user services, ADB, Bash, Python 3, and standard Linux tools. `potrait` is accepted as an alias.
 
 `waydroid show-full-ui` means the full Android interface, not desktop fullscreen. For independent desktop windows per Android app, Waydroid also provides `persist.waydroid.multi_windows` mode.
+
+Copy the latest Waydroid screen recording from `/sdcard/Movies` into the host `~/Videos` folder:
+
+```sh
+pnpm waydroid:recording
+# Or copy one specific file:
+pnpm waydroid:recording -- screen-20261104-152712.mp4
+```
+
+If multiple ADB devices are connected, the helper selects Waydroid when it can identify it; otherwise set `ANDROID_SERIAL`.
 
 ## iOS
 
