@@ -12,7 +12,9 @@
     "android:dev": "bash scripts/android.sh dev",
     "android:init": "bash scripts/android.sh init --ci --skip-targets-install",
     "android:sign-preview": "bash scripts/sign-preview.sh",
-    "waydroid:display": "bash scripts/waydroid-display.sh"
+    "waydroid:display": "bash scripts/waydroid-display.sh",
+    "waydroid:recording": "bash scripts/copy-waydroid-recording.sh",
+    "catalog:publish": "bash scripts/publish-catalog.sh"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.12.4"
