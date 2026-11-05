@@ -17,7 +17,7 @@ if [[ $# -eq 0 ]]; then set -- arm64-v8a x86_64; fi
 for abi in "$@"; do
   flavor="$abi"
   if [[ "$abi" == arm64-v8a ]]; then flavor=arm64; fi
-  input="src-tauri/gen/android/app/build/outputs/apk/$flavor/release/app-$flavor-release-unsigned.apk"
+  input="src/gen/android/app/build/outputs/apk/$flavor/release/app-$flavor-release-unsigned.apk"
   aligned=".tools/aligned-apks/$abi.apk"
   output="artifacts/comi-$abi-preview.apk"
   if [[ ! -f "$input" ]]; then
