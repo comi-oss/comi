@@ -25,7 +25,7 @@ after scraper data has been synced to D1.
 
 A minimal Tauri 2 app that opens [cf.mikira.id](https://cf.mikira.id/) directly in the system WebView and adds a Comifuro shopping list.
 
-The website supplies the map, search, and saved-booth list. Comi adds a chest shortcut above the map controls; it stays attached as the bottom sheet moves and opens a searchable catalog and locally saved shopping list with quantities and a running total. Catalog reads use the public, read-only Cloudflare Worker in [cloudflare/catalog-api](cloudflare/catalog-api), bound to the scraper's Comi D1 database. Shopping list entries stay on the device. Extracted catalog prices and items may need review. Initial map and catalog access require internet. The map's artwork and data are not bundled or claimed by this repository.
+The website supplies the map, search, and saved-booth list. Comi adds a chest shortcut above the map controls; it stays attached as the bottom sheet moves and opens a searchable catalog and locally saved shopping list with quantities and a running total. Catalog reads use the public, read-only Rust Cloudflare Worker in [src/cloudflare-worker](src/cloudflare-worker), bound to the scraper's Comi D1 database and catalog R2 bucket. Shopping list entries stay on the device. Extracted catalog prices and items may need review. Initial map and catalog access require internet. The map's artwork and data are not bundled or claimed by this repository.
 
 ## Requirements
 
@@ -39,7 +39,7 @@ pnpm android:build
 pnpm android:sign-preview
 ```
 
-There is no frontend development server or JavaScript UI dependency. The only pnpm dependency is the Tauri CLI. The app's URL is configured in `src-tauri/tauri.conf.json`; `src-tauri/src/lib.rs` injects the shopping-list shortcut and uses a narrow Rust command to fetch catalog data because the map's Content Security Policy blocks direct cross-origin requests. The UI follows the map website language and color theme. The API URL is public; no Cloudflare credentials are shipped in the app. Generated Kotlin/Gradle files provide the standard Android host and compile/package the Rust library.
+There is no frontend development server or JavaScript UI dependency. The only pnpm dependency is the Tauri CLI. The Tauri crate is in `src/`; its URL is configured in `src/tauri.conf.json`, and `src/src/lib.rs` injects the shopping-list shortcut and uses a narrow Rust command to fetch catalog data because the map's Content Security Policy blocks direct cross-origin requests. The separate Rust Worker crate is in `src/cloudflare-worker/`; it compiles to WebAssembly and deploys independently with `pnpm worker:deploy`. The Worker is co-located with the Tauri Rust source but is not linked into the Android/iOS app binary. The UI follows the map website language and color theme. The API URL is public; no Cloudflare credentials are shipped in the app. Generated Kotlin/Gradle files provide the standard Android host and compile/package the Tauri library.
 
 The Android build helper defaults to `.tools/android-sdk`, Java at `/usr/lib/jvm/java-21-openjdk-amd64`, and `.tools/gradle`. Override `ANDROID_HOME`, `NDK_HOME`, or `JAVA_HOME` for an existing installation. The checked-in Android project targets API 36 and supports Android 7.0+ (API 24). If regenerating it with `pnpm android:init`, check the requested SDK and preserve the pnpm invocation in `BuildTask.kt`.
 

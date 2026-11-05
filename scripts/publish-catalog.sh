@@ -18,7 +18,7 @@ MANIFEST="$OUT/current.json"
 VERSION="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["version"])' "$MANIFEST")"
 FILE="$(python3 -c 'import json,sys,os;print(os.path.basename(json.load(open(sys.argv[1]))["url"]))' "$MANIFEST")"
 
-pnpm dlx wrangler deploy --config "$ROOT/cloudflare/catalog-api/wrangler.toml"
+(cd "$ROOT/src/cloudflare-worker" && pnpm dlx wrangler deploy)
 pnpm dlx wrangler r2 object put "comi-catalog-releases/catalog/$FILE" \
   --file "$OUT/$FILE" --content-type application/vnd.sqlite3 \
   --cache-control 'public, max-age=31536000, immutable' --remote
