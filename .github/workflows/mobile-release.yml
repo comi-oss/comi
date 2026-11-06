@@ -129,6 +129,56 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm tauri ios init --ci
+      - name: Validate free Personal Team signing files
+        if: env.IOS_SIGNING_CONFIGURED == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          cert="$RUNNER_TEMP/comi-ios-development.p12"
+          profile="$RUNNER_TEMP/comi-ios-development.mobileprovision"
+          profile_plist="$RUNNER_TEMP/comi-ios-development.plist"
+          private_key="$RUNNER_TEMP/comi-ios-development.key.pem"
+          printf '%s' "$IOS_CERTIFICATE" | base64 --decode > "$cert"
+          printf '%s' "$IOS_MOBILE_PROVISION" | base64 --decode > "$profile"
+
+          # Fail here with an actionable message if the secret is not a usable
+          # PKCS#12 export or its password does not match. Tauri's later import
+          # otherwise fails with a low-level Security.framework error.
+          if ! openssl pkcs12 -in "$cert" -passin env:IOS_CERTIFICATE_PASSWORD -clcerts -nokeys -out "$RUNNER_TEMP/comi-ios-cert.pem" 2>"$RUNNER_TEMP/comi-ios-cert-error"; then
+            echo "IOS_CERTIFICATE could not be opened. Re-export the Apple Development certificate and private key from Keychain Access as a password-protected .p12, then update IOS_CERTIFICATE and IOS_CERTIFICATE_PASSWORD together."
+            exit 1
+          fi
+          if ! openssl pkcs12 -in "$cert" -passin env:IOS_CERTIFICATE_PASSWORD -nocerts -nodes -out "$private_key" 2>/dev/null || ! grep -q 'PRIVATE KEY' "$private_key"; then
+            echo "IOS_CERTIFICATE opened, but it does not contain the private signing key. Export the certificate together with its private key from Keychain Access."
+            exit 1
+          fi
+          rm -f "$private_key"
+
+          if ! security cms -D -i "$profile" > "$profile_plist" 2>/dev/null; then
+            echo "IOS_MOBILE_PROVISION is not a valid base64-encoded .mobileprovision profile."
+            exit 1
+          fi
+          python3 - "$profile_plist" <<'PY'
+          import datetime
+          import plistlib
+          import sys
+
+          with open(sys.argv[1], "rb") as profile_file:
+              profile = plistlib.load(profile_file)
+          expiration = profile["ExpirationDate"]
+          if expiration.tzinfo is None:
+              expiration = expiration.replace(tzinfo=datetime.timezone.utc)
+          expiration = expiration.astimezone(datetime.timezone.utc)
+          if expiration <= datetime.datetime.now(datetime.timezone.utc):
+              raise SystemExit(f"Personal Team provisioning profile expired at {expiration.isoformat()}; export a fresh profile from Xcode.")
+          app_id = profile.get("Entitlements", {}).get("application-identifier", "")
+          if app_id.split(".", 1)[-1] != "id.mikira.cf.viewer":
+              raise SystemExit(f"Provisioning profile targets {app_id!r}, expected the id.mikira.cf.viewer app identifier.")
+          if not profile.get("ProvisionedDevices"):
+              raise SystemExit("Provisioning profile has no registered devices. Add the test iPhone in Xcode and export its development profile again.")
+          print(f"Valid Personal Team profile for {app_id}; expires {expiration.isoformat()}.")
+          PY
       - name: Build iOS IPA with Personal Team signing
         if: env.IOS_SIGNING_CONFIGURED == 'true'
         run: pnpm tauri ios build --ci --export-method debugging
@@ -142,12 +192,23 @@ jobs:
           set -euo pipefail
           ipa="$(find src/gen/apple/build -type f -name '*.ipa' -print -quit)"
           test -n "$ipa"
-          cp "$ipa" "$RUNNER_TEMP/Comi-${VERSION}-IOS.ipa"
+          if [[ "$IOS_SIGNING_CONFIGURED" == "true" ]]; then
+            app_dir="$RUNNER_TEMP/comi-ios-ipa-check"
+            mkdir -p "$app_dir"
+            ditto -x -k "$ipa" "$app_dir"
+            app_path="$(find "$app_dir/Payload" -maxdepth 1 -type d -name '*.app' -print -quit)"
+            test -n "$app_path"
+            codesign --verify --deep --strict "$app_path"
+            test -f "$app_path/embedded.mobileprovision"
+            cp "$ipa" "$RUNNER_TEMP/Comi-${VERSION}-IOS-development.ipa"
+          else
+            cp "$ipa" "$RUNNER_TEMP/Comi-${VERSION}-IOS-unsigned.ipa"
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ios-unsigned
-          path: ${{ runner.temp }}/Comi-${{ needs.version.outputs.version }}-IOS.ipa
+          name: ${{ env.IOS_SIGNING_CONFIGURED == 'true' && 'ios-development' || 'ios-unsigned' }}
+          path: ${{ runner.temp }}/Comi-${{ needs.version.outputs.version }}-IOS-*.ipa
           if-no-files-found: error
 
   release:

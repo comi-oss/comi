@@ -52,13 +52,13 @@ The signing script creates optimized release APKs with a local development certi
 - `artifacts/comi-arm64-v8a-preview.apk`: ARM64 Android phones.
 - `artifacts/comi-x86_64-preview.apk`: x86_64 Waydroid.
 - `artifacts/apk-sizes.json`: exact byte counts, MB/MiB sizes, and SHA-256 checksums.
-- Merged pull requests to `main` produce Android ARM64 and iOS builds in a GitHub prerelease. The Android APK is signed with the repository's preview key. iOS builds are unsigned until the optional Personal Team secrets below are configured.
+- Merged pull requests to `main` produce Android ARM64 and iOS builds in a GitHub release. The Android APK is signed with the repository's preview key. iOS builds use free Personal Team development signing when the three signing secrets below are configured; otherwise CI attaches an unsigned IPA.
 
 ### Free iOS device signing
 
-For personal testing, sign into Xcode on a Mac with your Apple Account and use its free **Personal Team**. Set the generated Tauri iOS project to automatic signing, connect and register your iPhone, then build and run once from Xcode. Xcode creates a development certificate and a provisioning profile for that device. Export the Apple Development identity (including its private key) as a password-protected `.p12`; copy the matching `.mobileprovision` from `~/Library/MobileDevice/Provisioning Profiles/`.
+For personal testing, sign into Xcode on a Mac with your Apple Account and use its free **Personal Team**. Connect and register your iPhone, then build and run once from Xcode. Xcode creates a development certificate and a provisioning profile for that device. Export the Apple Development identity (including its private key) as a password-protected `.p12`; copy the matching `.mobileprovision` from `~/Library/MobileDevice/Provisioning Profiles/`.
 
-Store base64-encoded contents as GitHub Actions secrets named `IOS_CERTIFICATE`, `IOS_CERTIFICATE_PASSWORD`, and `IOS_MOBILE_PROVISION`. CI passes them to Tauri's iOS build using its documented manual-signing environment variables and exports a development IPA for devices included in the profile. Do not commit the `.p12` or profile. If these secrets are absent, CI publishes an unsigned IPA instead.
+Store base64-encoded contents as GitHub Actions secrets named `IOS_CERTIFICATE`, `IOS_CERTIFICATE_PASSWORD`, and `IOS_MOBILE_PROVISION`. CI validates the PKCS#12 password, profile expiration, app identifier, and registered devices before asking Tauri to export a development-signed IPA. Keep the certificate, password, and profile from the same Xcode signing setup; a mismatched password makes the certificate impossible to import. Do not commit the `.p12` or profile. If these secrets are absent, CI publishes an unsigned IPA instead.
 
 This free route is for your own device testing only. Personal Team App IDs, registered devices, and provisioning profiles expire after seven days, so refresh the profile and update the secret regularly; the app must be rebuilt and reinstalled after expiry. It cannot publish to TestFlight or the App Store. Apple requires paid Developer Program membership for those distribution features.
 
