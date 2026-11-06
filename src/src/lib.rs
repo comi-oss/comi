@@ -4,6 +4,7 @@ use sha2::{Digest, Sha256};
 use std::{
     fs,
     path::PathBuf,
+    sync::OnceLock,
     time::{SystemTime, UNIX_EPOCH},
 };
 use tauri::{webview::PageLoadEvent, AppHandle, Manager};
@@ -12,6 +13,7 @@ const INVENTORY_SHORTCUT_SCRIPT: &str = include_str!("../assets/inventory-shortc
 const INVENTORY_CSS: &str = include_str!("../assets/inventory-overlay.css");
 const COMI_CHEST_ICON: &str = include_str!("../assets/comi-chest.svg");
 const CATALOG_API: &str = "https://comi-catalog-api.ryanadi001.workers.dev";
+static CATALOG_IMAGE_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -223,10 +225,7 @@ fn parse_json(value: Option<&str>) -> serde_json::Value {
 async fn catalog_image(app: AppHandle, url: String, variant: String) -> Result<String, String> {
     let mut parsed =
         reqwest::Url::parse(&url).map_err(|_| "invalid catalog image URL".to_owned())?;
-    if parsed.scheme() != "https"
-        || parsed.host_str() != Some("pbs.twimg.com")
-        || !parsed.path().starts_with("/media/")
-    {
+    if !supported_catalog_image(&parsed) {
         return Err("unsupported catalog image host".to_owned());
     }
     let variant = match variant.as_str() {
@@ -234,7 +233,9 @@ async fn catalog_image(app: AppHandle, url: String, variant: String) -> Result<S
         "original" => "orig",
         _ => return Err("unsupported catalog image variant".to_owned()),
     };
-    parsed.query_pairs_mut().append_pair("name", variant);
+    if parsed.host_str() == Some("pbs.twimg.com") {
+        parsed.query_pairs_mut().append_pair("name", variant);
+    }
 
     let cache_dir = app
         .path()
@@ -244,10 +245,13 @@ async fn catalog_image(app: AppHandle, url: String, variant: String) -> Result<S
     fs::create_dir_all(&cache_dir).map_err(|_| "could not create image cache".to_owned())?;
     let cache_path = image_cache_path(&cache_dir, parsed.as_str());
     if let Ok(bytes) = fs::read(&cache_path) {
-        return Ok(format!("data:image/jpeg;base64,{}", STANDARD.encode(bytes)));
+        if let Some(mime) = catalog_image_mime(&bytes) {
+            return Ok(format!("data:{mime};base64,{}", STANDARD.encode(bytes)));
+        }
     }
 
-    let response = reqwest::Client::new()
+    let response = CATALOG_IMAGE_CLIENT
+        .get_or_init(reqwest::Client::new)
         .get(parsed)
         .send()
         .await
@@ -284,7 +288,39 @@ async fn catalog_image(app: AppHandle, url: String, variant: String) -> Result<S
 
 fn image_cache_path(cache_dir: &PathBuf, url: &str) -> PathBuf {
     let digest = Sha256::digest(url.as_bytes());
-    cache_dir.join(format!("{digest:x}.jpg"))
+    let extension = if url.ends_with(".webp") { "webp" } else { "jpg" };
+    cache_dir.join(format!("{digest:x}.{extension}"))
+}
+
+fn supported_catalog_image(url: &reqwest::Url) -> bool {
+    if url.scheme() != "https"
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.port_or_known_default() != Some(443)
+    {
+        return false;
+    }
+    match url.host_str() {
+        Some("pbs.twimg.com") => url.path().starts_with("/media/"),
+        Some("comi-catalog-api.ryanadi001.workers.dev") => url
+            .path()
+            .strip_prefix("/catalog/images/")
+            .and_then(|path| path.strip_suffix(".webp"))
+            .is_some_and(|hash| hash.len() == 64 && hash.bytes().all(|b| b.is_ascii_hexdigit())),
+        _ => false,
+    }
+}
+
+fn catalog_image_mime(bytes: &[u8]) -> Option<&'static str> {
+    if bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP") {
+        Some("image/webp")
+    } else if bytes.starts_with(&[0xff, 0xd8, 0xff]) {
+        Some("image/jpeg")
+    } else if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        Some("image/png")
+    } else {
+        None
+    }
 }
 
 fn prune_image_cache(cache_dir: &std::path::Path, max_bytes: u64) {
