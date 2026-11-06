@@ -160,7 +160,7 @@
     section.querySelectorAll('.comi-booth-plus').forEach((button)=>button.setAttribute('aria-label',t('plus')));
     section.querySelectorAll('.comi-booth-remove').forEach((button)=>button.setAttribute('aria-label',t('remove')));
   }
-  function imageKey(url,variant){return url+'|'+variant;}
+  function imageKey(url,variant){return url+'|'+(url.startsWith('https://comi-catalog-api.ryanadi001.workers.dev/catalog/images/')?'webp':variant);}
   function rememberImage(key,data) {
     const size=data.length*2;
     if(size>imageMemoryLimit)return;
@@ -168,8 +168,16 @@
     memoryImages.set(key,{data,size});imageMemorySize+=size;
     while(imageMemorySize>imageMemoryLimit){const oldest=memoryImages.keys().next().value;imageMemorySize-=memoryImages.get(oldest).size;memoryImages.delete(oldest);}
   }
+  function supportedCatalogImage(raw) {
+    try {
+      const url = new URL(raw);
+      if (url.protocol !== 'https:' || url.username || url.password || url.port) return false;
+      return (url.hostname === 'pbs.twimg.com' && url.pathname.startsWith('/media/')) ||
+        (url.hostname === 'comi-catalog-api.ryanadi001.workers.dev' && /^\/catalog\/images\/[a-fA-F0-9]{64}\.webp$/.test(url.pathname));
+    } catch { return false; }
+  }
   function requestCatalogImage(url,variant,priority=0,preload=false) {
-    if(!url||!url.startsWith('https://pbs.twimg.com/media/'))return Promise.resolve(null);
+    if(!supportedCatalogImage(url))return Promise.resolve(null);
     const key=imageKey(url,variant),cached=memoryImages.get(key);
     if(cached){memoryImages.delete(key);memoryImages.set(key,cached);return Promise.resolve(cached.data);}
     const existing=pendingImages.get(key);
@@ -285,7 +293,7 @@
     }
     for(const [image,groupItems] of groups){
       const card=node('article','comi-booth-group'),media=node('div','comi-booth-media');
-      if(image.startsWith('https://pbs.twimg.com/media/')){
+      if(supportedCatalogImage(image)){
         const img=node('img','comi-booth-image');img.dataset.sourceUrl=image;img.alt=groupItems[0].name||t('boothCatalog');img.loading='lazy';img.title=t('boothCatalog');img.addEventListener('click',()=>openImageViewer(img.currentSrc||img.src,img.alt,image));media.append(img);
         requestCatalogImage(image,'thumbnail',50,true).then((data)=>{if(data&&img.isConnected)img.src=data;else if(media.isConnected&&!img.src)media.append(node('span','comi-booth-image-fallback',t('imageUnavailable')));});
       }else media.append(node('span','comi-booth-image-fallback',t('imageUnavailable')));
